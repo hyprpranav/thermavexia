@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="style.css">
   <!-- Chart.js for real-time temperature visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Three.js for 3D real-time thermal apparatus model -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
   <!-- BROWSER COMPATIBILITY BANNER (shown only if Web Serial is unsupported) -->
@@ -75,15 +77,19 @@
 
         <!-- Serial Connect / Disconnect Buttons -->
         <button id="btn-connect" class="btn btn-primary" title="Connect to ESP32 over USB Serial">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v6m0 8v6M2 12h6m8 0h6"/>
-            <circle cx="12" cy="12" r="3"/>
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Distinct USB Plug Icon -->
+            <rect x="7" y="2" width="10" height="7" rx="1.5"/>
+            <rect x="9" y="9" width="6" height="5" rx="1"/>
+            <path d="M12 14v8"/>
+            <circle cx="10" cy="5.5" r="0.75" fill="currentColor"/>
+            <circle cx="14" cy="5.5" r="0.75" fill="currentColor"/>
           </svg>
           <span>Connect ESP32</span>
         </button>
 
         <button id="btn-disconnect" class="btn btn-danger hidden" title="Disconnect USB Serial Port">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -91,10 +97,10 @@
         </button>
 
         <!-- Theme Switcher -->
-        <button id="btn-theme-toggle" class="btn btn-icon" title="Toggle Dark/Light Mode" aria-label="Toggle Theme">
-          <!-- Sun Icon (for light mode switch) -->
-          <svg id="icon-sun" class="theme-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"/>
+        <button id="btn-theme-toggle" class="btn-icon-square" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">
+          <!-- Sun Icon (shown in light mode) -->
+          <svg id="icon-sun" class="theme-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5" fill="#f59e0b" stroke="#f59e0b"/>
             <line x1="12" y1="1" x2="12" y2="3"/>
             <line x1="12" y1="21" x2="12" y2="23"/>
             <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
@@ -104,8 +110,8 @@
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
-          <!-- Moon Icon (for dark mode switch) -->
-          <svg id="icon-moon" class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <!-- Moon Icon (shown in dark mode) -->
+          <svg id="icon-moon" class="theme-icon" viewBox="0 0 24 24" fill="#38bdf8" stroke="#38bdf8" stroke-width="1.5">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           </svg>
         </button>
@@ -291,6 +297,88 @@
 
     </section>
 
+    <!-- 3D THERMAL APPARATUS ANALOGY -->
+    <section class="section-panel" aria-label="3D Thermal Apparatus Analogy">
+      <div class="panel-header">
+        <div class="panel-title-group">
+          <div class="title-with-pill">
+            <h3 class="panel-title">3D Thermal Analogy &amp; Physical Apparatus</h3>
+            <span class="analogy-badge">INTERACTIVE 3D TWIN</span>
+          </div>
+          <span class="panel-subtitle">Titanium enclosure core (T1) conducting heat through the external copper rod (T2)</span>
+        </div>
+
+        <div class="model-controls-bar">
+          <!-- Color gradient scale legend -->
+          <div class="temp-gradient-legend">
+            <span class="legend-scale-title">Thermal Gradient:</span>
+            <div class="legend-scale-track">
+              <span class="scale-segment seg-cold" title="Cold (&lt; 28°C)">Cold &lt;28°</span>
+              <span class="scale-segment seg-nominal" title="Nominal (28°C - 32°C)">Nominal 28-32°</span>
+              <span class="scale-segment seg-warm" title="Warm (33°C - 39°C)">Warm 33-39°</span>
+              <span class="scale-segment seg-hot" title="Hot (&ge; 40°C)">Hot &ge;40°</span>
+            </div>
+          </div>
+
+          <div class="btn-group">
+            <button id="btn-toggle-autorotate" class="btn btn-sm btn-outline" title="Toggle automatic 3D rotation">
+              <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
+              </svg>
+              <span id="lbl-autorotate">Auto-Rotate: ON</span>
+            </button>
+            <button id="btn-reset-3d-view" class="btn btn-sm btn-outline" title="Reset camera to default angle">
+              <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+              </svg>
+              <span>Reset View</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="model-3d-container">
+        <!-- Interactive 3D Canvas -->
+        <canvas id="thermal3dCanvas"></canvas>
+
+        <!-- Live 3D HUD Telemetry Overlay -->
+        <div class="model-3d-hud">
+          <div class="hud-item hud-t1">
+            <div class="hud-item-header">
+              <span class="hud-color-swatch" id="hud-swatch-t1"></span>
+              <span class="hud-label">T1 Inside Core (Resistor)</span>
+            </div>
+            <div class="hud-val-row">
+              <span id="hud-val-t1" class="hud-val">--.--</span>
+              <span class="hud-unit">°C</span>
+              <span id="hud-tag-t1" class="hud-tag">Standby</span>
+            </div>
+          </div>
+
+          <div class="hud-item hud-t2">
+            <div class="hud-item-header">
+              <span class="hud-color-swatch" id="hud-swatch-t2"></span>
+              <span class="hud-label">T2 Outside Rod (Copper Sink)</span>
+            </div>
+            <div class="hud-val-row">
+              <span id="hud-val-t2" class="hud-val">--.--</span>
+              <span class="hud-unit">°C</span>
+              <span id="hud-tag-t2" class="hud-tag">Standby</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="model-interaction-hint">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m10 15 5-3-5-3v6z"/>
+          </svg>
+          <span>Click &amp; Drag to Rotate 3D View &bull; Scroll to Zoom</span>
+        </div>
+      </div>
+    </section>
+
     <!-- LIVE TEMPERATURE GRAPH -->
     <section class="section-panel" aria-label="Real-time Temperature Chart">
       <div class="panel-header">
@@ -310,7 +398,7 @@
               Window: <span id="window-size-text">60 pts</span>
             </button>
             <button id="btn-reset-chart" class="btn btn-sm btn-outline" title="Clear temperature plot">
-              <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
               </svg>
@@ -359,21 +447,21 @@
       <div class="logger-controls-bar">
         <div class="btn-group">
           <button id="btn-start-record" class="btn btn-success" title="Start recording incoming sensor readings">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="12" r="7"/>
             </svg>
             <span>Start Recording</span>
           </button>
 
           <button id="btn-stop-record" class="btn btn-warning" disabled title="Stop recording session">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="6" width="12" height="12" rx="2"/>
             </svg>
             <span>Stop Recording</span>
           </button>
 
           <button id="btn-download-csv" class="btn btn-primary" disabled title="Export recorded data to CSV">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
@@ -474,7 +562,7 @@
           </p>
           <div class="sim-controls">
             <button id="btn-toggle-sim" class="btn btn-sm btn-secondary">
-              <svg class="btn-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
               <span>Enable Offline Simulation</span>

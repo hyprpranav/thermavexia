@@ -63,6 +63,25 @@
     chart: null,
     chartWindowSize: 60, // points
 
+    // 3D Apparatus Model
+    model3d: {
+      scene: null,
+      camera: null,
+      renderer: null,
+      apparatusGroup: null,
+      boxMesh: null,
+      resistorMesh: null,
+      sensorT1Mesh: null,
+      sensorT2Mesh: null,
+      rodMesh: null,
+      lightCore: null,
+      lightRod: null,
+      autoRotate: true,
+      isDragging: false,
+      targetCoreColor: 0x64748b,
+      targetRodColor: 0x64748b
+    },
+
     // Simulation
     isSimulating: false,
     simInterval: null,
@@ -118,6 +137,18 @@
     lblThresholdValue: document.getElementById('lbl-threshold-value'),
     lblLastPacket: document.getElementById('lbl-last-packet'),
     lblPacketRate: document.getElementById('lbl-packet-rate'),
+
+    // 3D Apparatus Model
+    canvas3D: document.getElementById('thermal3dCanvas'),
+    btnToggleAutoRotate: document.getElementById('btn-toggle-autorotate'),
+    lblAutoRotate: document.getElementById('lbl-autorotate'),
+    btnReset3DView: document.getElementById('btn-reset-3d-view'),
+    hudValT1: document.getElementById('hud-val-t1'),
+    hudSwatchT1: document.getElementById('hud-swatch-t1'),
+    hudTagT1: document.getElementById('hud-tag-t1'),
+    hudValT2: document.getElementById('hud-val-t2'),
+    hudSwatchT2: document.getElementById('hud-swatch-t2'),
+    hudTagT2: document.getElementById('hud-tag-t2'),
 
     // Chart
     chartCanvas: document.getElementById('temperatureChart'),
@@ -642,6 +673,9 @@
     // Push to Chart
     addChartDataPoint(timeStr, t1, t2);
 
+    // Update 3D Apparatus Digital Twin
+    update3DTelemetry(t1, t2);
+
     // Record sample if logger is active
     if (State.isRecording) {
       recordSample(new Date(), t1, t2, delta, State.alertLevel);
@@ -772,6 +806,9 @@
     );
 
     DOM.chartEmptyOverlay.classList.remove('hidden');
+
+    // Reset 3D Model Telemetry & HUD
+    reset3DTelemetry();
   }
 
   // ----------------------------------------------------------------------------
@@ -1036,7 +1073,540 @@
   }
 
   // ----------------------------------------------------------------------------
-  // 10. APP BOOTSTRAP
+  // 10. 3D THERMAL APPARATUS DIGITAL TWIN (THREE.JS)
+  // ----------------------------------------------------------------------------
+  function getThermalColor(temp) {
+    if (temp === null || isNaN(temp)) {
+      return {
+        hex: 0x64748b,
+        css: '#64748b',
+        tag: 'Standby'
+      };
+    }
+
+    if (temp < 28) {
+      // Cold / Ice: Blue range
+      return {
+        hex: 0x2563eb,
+        css: '#2563eb',
+        tag: 'Cold / Ice'
+      };
+    } else if (temp <= 32) {
+      // 28°C to 32°C: Green (Nominal)
+      return {
+        hex: 0x10b981,
+        css: '#10b981',
+        tag: 'Nominal'
+      };
+    } else if (temp < 40) {
+      // 33°C to 39°C: Warm / Heating (Amber to Orange)
+      return {
+        hex: 0xf59e0b,
+        css: '#f59e0b',
+        tag: 'Warm / Heating'
+      };
+    } else {
+      // >= 40°C: Hot / High Thermal Load (Crimson Red)
+      return {
+        hex: 0xef4444,
+        css: '#ef4444',
+        tag: 'Hot / Critical'
+      };
+    }
+  }
+
+  // Helper: Create 3D text sprite label
+  function createTextSprite(text, borderColor) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // Background pill
+    ctx.fillStyle = 'rgba(11, 17, 29, 0.9)';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(4, 4, 248, 56, 10);
+    } else {
+      ctx.rect(4, 4, 248, 56);
+    }
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = borderColor || '#38bdf8';
+    ctx.lineWidth = 3;
+    if (ctx.roundRect) {
+      ctx.roundRect(4, 4, 248, 56, 10);
+    } else {
+      ctx.strokeRect(4, 4, 248, 56);
+    }
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(1.5, 0.38, 1);
+    return sprite;
+  }
+
+  function init3DModel() {
+    if (!DOM.canvas3D || typeof THREE === 'undefined') return;
+
+    const canvas = DOM.canvas3D;
+    const container = canvas.parentElement;
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 380;
+
+    // 1. Scene
+    const scene = new THREE.Scene();
+    State.model3d.scene = scene;
+
+    // 2. Camera (Perspective)
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, 1.8, 7.8);
+    camera.lookAt(0, 0, 0);
+    State.model3d.camera = camera;
+
+    // 3. WebGL Renderer
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: true,
+      alpha: true
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    State.model3d.renderer = renderer;
+
+    // 4. Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.85);
+    dirLight1.position.set(5, 10, 7);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.4);
+    dirLight2.position.set(-5, -2, -5);
+    scene.add(dirLight2);
+
+    // Dynamic point lights for internal core (T1) and external rod (T2)
+    const lightCore = new THREE.PointLight(0x64748b, 1.4, 4.5);
+    lightCore.position.set(-0.4, -0.3, 0);
+    scene.add(lightCore);
+    State.model3d.lightCore = lightCore;
+
+    const lightRod = new THREE.PointLight(0x64748b, 1.2, 5);
+    lightRod.position.set(2.8, -0.4, 0);
+    scene.add(lightRod);
+    State.model3d.lightRod = lightRod;
+
+    // 5. Rotatable Apparatus Root Group
+    const apparatusGroup = new THREE.Group();
+    // Centered in 3D viewport
+    apparatusGroup.position.set(-0.8, 0.2, 0);
+    scene.add(apparatusGroup);
+    State.model3d.apparatusGroup = apparatusGroup;
+
+    // --- Subsea Mounting Grid / Floor ---
+    const grid = new THREE.GridHelper(9, 18, 0x38bdf8, 0x1e2c45);
+    grid.position.set(0.8, -1.4, 0);
+    grid.material.opacity = 0.35;
+    grid.material.transparent = true;
+    apparatusGroup.add(grid);
+
+    // --- A. Titanium Sealed Enclosure Box (Rectangular Enclosure) ---
+    // Dimensions: Length (X) 3.6, Height (Y) 2.2, Depth (Z) 2.4
+    // Long side is front (3.6), small side is the end face at x = +1.8
+    const boxGeo = new THREE.BoxGeometry(3.6, 2.2, 2.4);
+    const boxMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.85,
+      roughness: 0.25,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    });
+    const boxMesh = new THREE.Mesh(boxGeo, boxMat);
+    boxMesh.position.set(0, 0, 0);
+    apparatusGroup.add(boxMesh);
+    State.model3d.boxMesh = boxMesh;
+
+    // Crisp wireframe edge highlights
+    const boxEdgesGeo = new THREE.EdgesGeometry(boxGeo);
+    const boxEdgesMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.75
+    });
+    const boxEdges = new THREE.LineSegments(boxEdgesGeo, boxEdgesMat);
+    boxMesh.add(boxEdges);
+
+    // Side Collar Bushing (on the small side face where the rod exits horizontally)
+    const collarGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.16, 32);
+    const collarMat = new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      metalness: 0.9,
+      roughness: 0.2
+    });
+    const collarMesh = new THREE.Mesh(collarGeo, collarMat);
+    collarMesh.rotation.z = Math.PI / 2;
+    collarMesh.position.set(1.8, -0.26, 0);
+    apparatusGroup.add(collarMesh);
+
+    // --- B. Internal Electronics PCB & Power Resistor (Heat Source) ---
+    const pcbGeo = new THREE.BoxGeometry(3.0, 0.08, 1.8);
+    const pcbMat = new THREE.MeshStandardMaterial({
+      color: 0x0f2b1d, // Circuit substrate
+      metalness: 0.3,
+      roughness: 0.7
+    });
+    const pcbMesh = new THREE.Mesh(pcbGeo, pcbMat);
+    pcbMesh.position.set(-0.1, -0.95, 0);
+    apparatusGroup.add(pcbMesh);
+
+    // Power Resistor Block (T1 Heat Source inside)
+    const resistorGeo = new THREE.BoxGeometry(1.6, 0.42, 0.75);
+    const resistorMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      metalness: 0.6,
+      roughness: 0.3,
+      emissive: 0x64748b,
+      emissiveIntensity: 0.35
+    });
+    const resistorMesh = new THREE.Mesh(resistorGeo, resistorMat);
+    resistorMesh.position.set(-0.5, -0.65, 0);
+    apparatusGroup.add(resistorMesh);
+    State.model3d.resistorMesh = resistorMesh;
+
+    // Resistor Thermal Fins (subtle lateral fins flush with heater)
+    for (let i = -1.1; i <= 0.1; i += 0.25) {
+      const finGeo = new THREE.BoxGeometry(0.06, 0.44, 0.82);
+      const finMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        metalness: 0.7,
+        roughness: 0.3
+      });
+      const fin = new THREE.Mesh(finGeo, finMat);
+      fin.position.set(i, -0.65, 0);
+      apparatusGroup.add(fin);
+    }
+
+    // --- C. Horizontal Copper Conduction Rod (T2 Heat Path) ---
+    // Sits directly ABOVE the heating element inside the box, in thermal contact,
+    // and exits horizontally through the small side wall into the external water!
+    // Spans from x = -1.3 (covering the top of the heater) to x = 3.8 outside (length 5.1 units)
+    const rodGeo = new THREE.CylinderGeometry(0.18, 0.18, 5.1, 32);
+    const rodMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      metalness: 0.85,
+      roughness: 0.25,
+      emissive: 0x64748b,
+      emissiveIntensity: 0.3
+    });
+    const rodMesh = new THREE.Mesh(rodGeo, rodMat);
+    rodMesh.rotation.z = Math.PI / 2;
+    rodMesh.position.set(1.25, -0.26, 0);
+    apparatusGroup.add(rodMesh);
+    State.model3d.rodMesh = rodMesh;
+
+    // Thermal interface saddle plate between heater block and copper rod
+    const saddleGeo = new THREE.BoxGeometry(1.6, 0.08, 0.4);
+    const saddleMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      metalness: 0.85,
+      roughness: 0.2
+    });
+    const saddleMesh = new THREE.Mesh(saddleGeo, saddleMat);
+    saddleMesh.position.set(-0.5, -0.42, 0);
+    apparatusGroup.add(saddleMesh);
+
+    // --- D. Internal DS18B20 Temperature Sensor (T1) ---
+    // Mounted directly on top of the copper rod directly over the heating element
+    const sensorT1Geo = new THREE.CylinderGeometry(0.07, 0.07, 0.5, 16);
+    const sensorT1Mat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      metalness: 0.9,
+      roughness: 0.2,
+      emissive: 0x64748b,
+      emissiveIntensity: 0.4
+    });
+    const sensorT1Mesh = new THREE.Mesh(sensorT1Geo, sensorT1Mat);
+    sensorT1Mesh.rotation.z = Math.PI / 2;
+    sensorT1Mesh.position.set(-0.5, -0.02, 0.05);
+    apparatusGroup.add(sensorT1Mesh);
+    State.model3d.sensorT1Mesh = sensorT1Mesh;
+
+    // Metal mounting clamp bracket around rod and T1 probe
+    const clampT1Geo = new THREE.CylinderGeometry(0.24, 0.24, 0.12, 32);
+    const clampT1Mat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+    const clampT1Mesh = new THREE.Mesh(clampT1Geo, clampT1Mat);
+    clampT1Mesh.rotation.z = Math.PI / 2;
+    clampT1Mesh.position.set(-0.5, -0.26, 0);
+    apparatusGroup.add(clampT1Mesh);
+
+    // Black heat-shrink collar on back of T1 probe
+    const shrinkT1Geo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 16);
+    const shrinkT1Mat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const shrinkT1 = new THREE.Mesh(shrinkT1Geo, shrinkT1Mat);
+    shrinkT1.rotation.z = Math.PI / 2;
+    shrinkT1.position.set(-0.78, -0.02, 0.05);
+    apparatusGroup.add(shrinkT1);
+
+    // Cable tail down to PCB
+    const wireT1Geo = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 8);
+    const wireT1Mat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+    const wireT1 = new THREE.Mesh(wireT1Geo, wireT1Mat);
+    wireT1.position.set(-0.84, -0.42, 0.05);
+    apparatusGroup.add(wireT1);
+
+    // 3D Floating Tag for T1
+    const spriteT1 = createTextSprite('T1: DS18B20', '#f97316');
+    spriteT1.position.set(-0.5, 0.45, 0.05);
+    apparatusGroup.add(spriteT1);
+
+    // --- E. External DS18B20 Temperature Sensor (T2) ---
+    // Stainless steel probe mounted directly onto the external horizontal copper rod outside the box
+    const sensorT2Geo = new THREE.CylinderGeometry(0.07, 0.07, 0.5, 16);
+    const sensorT2Mat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      metalness: 0.9,
+      roughness: 0.2,
+      emissive: 0x64748b,
+      emissiveIntensity: 0.4
+    });
+    const sensorT2Mesh = new THREE.Mesh(sensorT2Geo, sensorT2Mat);
+    sensorT2Mesh.rotation.z = Math.PI / 2;
+    sensorT2Mesh.position.set(2.8, -0.02, 0.05);
+    apparatusGroup.add(sensorT2Mesh);
+    State.model3d.sensorT2Mesh = sensorT2Mesh;
+
+    // Metal mounting clamp bracket around copper rod and T2 probe
+    const clampT2Geo = new THREE.CylinderGeometry(0.24, 0.24, 0.12, 32);
+    const clampT2Mat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+    const clampT2Mesh = new THREE.Mesh(clampT2Geo, clampT2Mat);
+    clampT2Mesh.rotation.z = Math.PI / 2;
+    clampT2Mesh.position.set(2.8, -0.26, 0);
+    apparatusGroup.add(clampT2Mesh);
+
+    // Black heat-shrink collar on back of T2 probe
+    const shrinkT2Geo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 16);
+    const shrinkT2Mat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const shrinkT2 = new THREE.Mesh(shrinkT2Geo, shrinkT2Mat);
+    shrinkT2.rotation.z = Math.PI / 2;
+    shrinkT2.position.set(3.08, -0.02, 0.05);
+    apparatusGroup.add(shrinkT2);
+
+    // Flexible cable tail trailing away into marine harness
+    const cableT2Geo = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 8);
+    const cableT2Mat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+    const cableT2 = new THREE.Mesh(cableT2Geo, cableT2Mat);
+    cableT2.rotation.x = Math.PI / 3;
+    cableT2.position.set(3.2, -0.2, 0.35);
+    apparatusGroup.add(cableT2);
+
+    // 3D Floating Tag for T2
+    const spriteT2 = createTextSprite('T2: DS18B20', '#06b6d4');
+    spriteT2.position.set(2.8, 0.45, 0.05);
+    apparatusGroup.add(spriteT2);
+
+    // Initial isometric orientation
+    apparatusGroup.rotation.y = 0.45;
+    apparatusGroup.rotation.x = 0.18;
+
+    // Setup interactive Orbit / Drag Handlers
+    setup3DInteraction(canvas, apparatusGroup, camera);
+
+    // Auto-Rotate & Reset Buttons
+    if (DOM.btnToggleAutoRotate) {
+      DOM.btnToggleAutoRotate.addEventListener('click', () => {
+        State.model3d.autoRotate = !State.model3d.autoRotate;
+        DOM.lblAutoRotate.textContent = `Auto-Rotate: ${State.model3d.autoRotate ? 'ON' : 'OFF'}`;
+      });
+    }
+
+    if (DOM.btnReset3DView) {
+      DOM.btnReset3DView.addEventListener('click', () => {
+        apparatusGroup.rotation.set(0.18, 0.45, 0);
+        camera.position.set(0, 1.8, 7.8);
+        camera.lookAt(0, 0, 0);
+      });
+    }
+
+    // Resize Observer
+    const resizeObserver = new ResizeObserver(() => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w > 0 && h > 0) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+    });
+    resizeObserver.observe(container);
+
+    // Start render loop
+    animate3D();
+  }
+
+  function setup3DInteraction(canvas, group, camera) {
+    let isDown = false;
+    let startX = 0;
+    let startY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDown = true;
+      State.model3d.isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      group.rotation.y += dx * 0.008;
+      group.rotation.x = Math.max(-0.6, Math.min(0.8, group.rotation.x + dy * 0.008));
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDown = false;
+      State.model3d.isDragging = false;
+    });
+
+    // Touch support for mobile / tablets
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        isDown = true;
+        State.model3d.isDragging = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDown || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+
+      group.rotation.y += dx * 0.008;
+      group.rotation.x = Math.max(-0.6, Math.min(0.8, group.rotation.x + dy * 0.008));
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+      isDown = false;
+      State.model3d.isDragging = false;
+    });
+
+    // Wheel zoom
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY * 0.005;
+      camera.position.z = Math.max(5.0, Math.min(13, camera.position.z + zoomFactor));
+    }, { passive: false });
+  }
+
+  function animate3D() {
+    requestAnimationFrame(animate3D);
+
+    const m = State.model3d;
+    if (!m.renderer || !m.scene || !m.camera) return;
+
+    // Apply auto-rotation if active and not dragging
+    if (m.autoRotate && !m.isDragging) {
+      m.apparatusGroup.rotation.y += 0.005;
+    }
+
+    // Smooth color interpolation for T1 (Resistor & T1 Sensor)
+    if (m.resistorMesh) {
+      const targetC1 = new THREE.Color(m.targetCoreColor);
+      m.resistorMesh.material.color.lerp(targetC1, 0.08);
+      m.resistorMesh.material.emissive.lerp(targetC1, 0.08);
+      if (m.sensorT1Mesh) {
+        m.sensorT1Mesh.material.color.lerp(targetC1, 0.08);
+        m.sensorT1Mesh.material.emissive.lerp(targetC1, 0.08);
+      }
+      if (m.lightCore) {
+        m.lightCore.color.lerp(targetC1, 0.08);
+      }
+    }
+
+    // Smooth color interpolation for T2 (Horizontal Rod & T2 Sensor)
+    if (m.rodMesh) {
+      const targetC2 = new THREE.Color(m.targetRodColor);
+      m.rodMesh.material.color.lerp(targetC2, 0.08);
+      m.rodMesh.material.emissive.lerp(targetC2, 0.08);
+      if (m.sensorT2Mesh) {
+        m.sensorT2Mesh.material.color.lerp(targetC2, 0.08);
+        m.sensorT2Mesh.material.emissive.lerp(targetC2, 0.08);
+      }
+      if (m.lightRod) {
+        m.lightRod.color.lerp(targetC2, 0.08);
+      }
+    }
+
+    m.renderer.render(m.scene, m.camera);
+  }
+
+  function update3DTelemetry(t1, t2) {
+    const c1 = getThermalColor(t1);
+    const c2 = getThermalColor(t2);
+
+    State.model3d.targetCoreColor = c1.hex;
+    State.model3d.targetRodColor = c2.hex;
+
+    if (DOM.hudValT1) DOM.hudValT1.textContent = t1.toFixed(1);
+    if (DOM.hudSwatchT1) DOM.hudSwatchT1.style.backgroundColor = c1.css;
+    if (DOM.hudTagT1) {
+      DOM.hudTagT1.textContent = c1.tag;
+      DOM.hudTagT1.style.color = c1.css;
+      DOM.hudTagT1.style.borderColor = c1.css;
+    }
+
+    if (DOM.hudValT2) DOM.hudValT2.textContent = t2.toFixed(1);
+    if (DOM.hudSwatchT2) DOM.hudSwatchT2.style.backgroundColor = c2.css;
+    if (DOM.hudTagT2) {
+      DOM.hudTagT2.textContent = c2.tag;
+      DOM.hudTagT2.style.color = c2.css;
+      DOM.hudTagT2.style.borderColor = c2.css;
+    }
+  }
+
+  function reset3DTelemetry() {
+    State.model3d.targetCoreColor = 0x64748b;
+    State.model3d.targetRodColor = 0x64748b;
+
+    if (DOM.hudValT1) DOM.hudValT1.textContent = '--.--';
+    if (DOM.hudSwatchT1) DOM.hudSwatchT1.style.backgroundColor = 'var(--text-muted)';
+    if (DOM.hudTagT1) {
+      DOM.hudTagT1.textContent = 'Standby';
+      DOM.hudTagT1.style.color = 'var(--text-muted)';
+      DOM.hudTagT1.style.borderColor = 'var(--border-subtle)';
+    }
+
+    if (DOM.hudValT2) DOM.hudValT2.textContent = '--.--';
+    if (DOM.hudSwatchT2) DOM.hudSwatchT2.style.backgroundColor = 'var(--text-muted)';
+    if (DOM.hudTagT2) {
+      DOM.hudTagT2.textContent = 'Standby';
+      DOM.hudTagT2.style.color = 'var(--text-muted)';
+      DOM.hudTagT2.style.borderColor = 'var(--border-subtle)';
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 11. APP BOOTSTRAP
   // ----------------------------------------------------------------------------
   function initApp() {
     // 1. Initialize Theme
@@ -1045,20 +1615,23 @@
     // 2. Initialize Chart
     initChart();
 
-    // 3. Verify Web Serial API support
+    // 3. Initialize 3D Thermal Apparatus Model
+    init3DModel();
+
+    // 4. Verify Web Serial API support
     checkWebSerialSupport();
 
-    // 4. Bind Serial Connect / Disconnect buttons
+    // 5. Bind Serial Connect / Disconnect buttons
     DOM.btnConnect.addEventListener('click', connectESP32);
     DOM.btnDisconnect.addEventListener('click', disconnectESP32);
 
-    // 5. Initialize Logger
+    // 6. Initialize Logger
     initLogger();
 
-    // 6. Initialize Configuration & Thresholds
+    // 7. Initialize Configuration & Thresholds
     initConfig();
 
-    // 7. Initialize Simulation Mode
+    // 8. Initialize Simulation Mode
     initSimulation();
 
     console.log('THERMAVEXIA Thermal Intelligence Platform successfully initialized.');

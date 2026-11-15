@@ -158,28 +158,38 @@ Deploying THERMAVEXIA to Vercel provides a free, instant HTTPS URL where Web Ser
 - **Card 3 (Temperature Difference):** Dynamically calculated thermal gradient ($$\Delta T = T1 - T2$$).
 - **Card 4 (Operational Status):** Real-time status (`Monitoring`, `Warning`, `Critical`, or `Sensor Error`) with packet frequency.
 
-### 2. Dual-Line Live Graph
+### 2. Interactive 3D Thermal Apparatus Digital Twin (Three.js)
+- Real-time 3D visualization of the sealed titanium enclosure, internal power heating element, horizontal copper conduction rod, and dual DS18B20 digital temperature sensors ($T_1$ inside & $T_2$ outside).
+- Dynamic thermodynamic color gradients:
+  - **$< 28^\circ\text{C}$**: Cool Blue (subsea ambient / cold)
+  - **$28^\circ\text{C} - 32^\circ\text{C}$**: Emerald Green (nominal thermal operating balance)
+  - **$33^\circ\text{C} - 39^\circ\text{C}$**: Amber / Orange (warming / active heat dissipation)
+  - **$\ge 40^\circ\text{C}$**: Crimson Red (high thermal load)
+- Full 360° interactive orbit rotation, zoom, auto-rotation toggle, and reset view controls.
+- Integrated 3D HUD overlay tracking live $T_1$ and $T_2$ readings with color swatches.
+
+### 3. Dual-Line Live Graph
 - Plots T1 (Orange) and T2 (Cyan) simultaneously on a rolling time window.
 - Toggle between `30 pts`, `60 pts`, and `120 pts` time window scales.
 - Interactive tooltip reveals exact values and calculated $$\Delta T$$ on mouse hover.
 - Click **Reset Graph** to clear history when starting a new experimental trial.
 
-### 3. Thermal Data Logger & CSV Export
+### 4. Thermal Data Logger & CSV Export
 - Click **Start Recording** to begin logging every valid packet with ISO 8601 timestamps.
 - Live sample counter and session elapsed timer show active recording state.
 - Recent readings preview table displays the latest 25 recorded points.
 - Click **Download CSV** to immediately export an RFC 4180-compliant `.csv` file formatted for Excel, MATLAB, Python pandas, or OriginLab analysis.
 
-### 4. Software Warning Threshold
+### 5. Software Warning Threshold
 - Customize the High Temperature Warning limit (default: 60.0°C) in the **Diagnostics & Alarm Configuration** panel.
 - The interface automatically changes state to `Warning` or `Critical` if internal enclosure temperature exceeds safe research parameters.
 
-### 5. Theme Switching
+### 6. Theme Switching
 - Click the Moon/Sun icon in the top right to switch between **Dark Mode** and **Light Mode**.
 - Theme choices are saved to `localStorage` and persist upon refresh.
 - Chart.js gridlines, text, and tooltips re-render automatically to match the selected theme.
 
-### 6. Offline Bench Simulation Mode
+### 7. Offline Bench Simulation Mode
 - If physical hardware is unavailable during software presentation or evaluation, click **Enable Offline Simulation** in the diagnostics panel.
 - The platform simulates realistic thermodynamic heating and passive cooling curves at 1 Hz.
 - An amber watermark banner clearly indicates that simulation data is active to preserve scientific integrity.
