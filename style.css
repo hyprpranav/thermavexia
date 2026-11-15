@@ -469,6 +469,32 @@ html, body {
   gap: 14px;
 }
 
+/* Designer Pill in Context Banner */
+.designer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+  border: 1px solid var(--border-active);
+  font-size: 11px;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.designer-pill strong {
+  color: var(--accent-primary);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.designer-pill-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-primary);
+}
+
 .context-header {
   display: flex;
   align-items: center;
@@ -1072,15 +1098,16 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
-   11. Footer
+   11. Footer & Attribution
    -------------------------------------------------------------------------- */
 .app-footer {
-  margin-top: 24px;
+  margin-top: 36px;
   border-top: 1px solid var(--border-subtle);
   background-color: var(--bg-header);
-  padding: 16px 24px;
+  padding: 24px;
   font-size: 12px;
   color: var(--text-muted);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
 }
 
 .footer-container {
@@ -1090,11 +1117,67 @@ html, body {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 18px;
+}
+
+.footer-brand-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .footer-brand {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+
+.footer-subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.footer-credit-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.credit-highlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15));
+  border: 1px solid var(--border-active);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.2);
+}
+
+.credit-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.credit-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.footer-copyright {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
 }
 
 /* --------------------------------------------------------------------------

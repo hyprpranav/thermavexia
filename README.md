@@ -198,9 +198,11 @@ Deploying THERMAVEXIA to Vercel provides a free, instant HTTPS URL where Web Ser
 
 ---
 
-## 11. Academic Attribution
+## 11. Project Attribution & Rights
 
-- **Project:** Design and Thermal Analysis of a Passive Cooling Mechanism for Sealed Titanium-Enclosed Electronics in Underwater Applications.
-- **Platform:** THERMAVEXIA Thermal Intelligence Platform
-- **Microcontroller:** ESP32 (OneWire + I2C SSD1306 + USB Serial Telemetry)
-- **Frontend Architecture:** HTML5, CSS3 Variables, Vanilla JS ES6+, Web Serial API, Chart.js.
+- **Project Title:** Design and Thermal Analysis of a Passive Cooling Mechanism for Sealed Titanium-Enclosed Electronics in Underwater Applications.
+- **Platform Name:** THERMAVEXIA &bull; Thermal Intelligence Platform
+- **Designed & Developed by:** **Kiruba**
+- **Microcontroller & Embedded Stack:** ESP32 (OneWire + I2C SSD1306 + USB Serial Telemetry)
+- **Frontend Architecture:** HTML5, CSS3 Variables, Vanilla JS ES6+, Web Serial API, Chart.js
+- **Copyright:** &copy; 2026 **Kiruba**. All Rights Reserved.

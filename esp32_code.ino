@@ -4,6 +4,9 @@
  * Project Title: Design and Thermal Analysis of a Passive Cooling Mechanism 
  *                for Sealed Titanium-Enclosed Electronics in Underwater Applications
  * 
+ * Designed & Developed by: Kiruba
+ * All Rights Reserved
+ * 
  * Target Hardware:
  *   - Microcontroller: ESP32 DevKit V1
  *   - Internal Temp Sensor (T1): DS18B20 on OneWire Bus (GPIO 4)
